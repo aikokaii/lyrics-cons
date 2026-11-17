@@ -57,20 +57,28 @@ export function mountMenu(root: HTMLElement, songs: Song[]): () => void {
     a.append(num, info, dot);
     a.addEventListener('pointerenter', () => prefetchAudio(song.audio));
     a.addEventListener('pointerdown', () => prefetchAudio(song.audio));
+    a.addEventListener('focus', () => prefetchAudio(song.audio));
     li.appendChild(a);
     list.appendChild(li);
   });
 
-  // Enter langsung membuka lagu pertama.
+  // Enter langsung membuka lagu pertama selama belum ada yang difokus. Sengaja tidak memanggil
+  // focus() pada lagu pertama: fokus lewat kode memicu :focus-visible, sehingga lagu 1 tampak
+  // seperti sedang di-hover sampai pengguna mengklik di tempat lain.
   const first = list.querySelector<HTMLAnchorElement>('a');
-  first?.focus({ preventScroll: true });
-  // Prefetch lewat keyboard dipasang setelah fokus awal di atas, supaya membuka menu saja
-  // tidak langsung mengunduh lagu pertama (boros kuota di HP).
-  list.querySelectorAll('a').forEach((a, i) =>
-    a.addEventListener('focus', () => prefetchAudio(songs[i].audio)),
-  );
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' || e.repeat || !first) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return; // biarkan Enter bekerja pada elemen yang difokus
+    e.preventDefault();
+    first.click();
+  };
+  window.addEventListener('keydown', onKey);
 
   const unbindFs = bindFullscreenButton(root.querySelector<HTMLButtonElement>('.fs')!);
 
-  return () => unbindFs();
+  return () => {
+    window.removeEventListener('keydown', onKey);
+    unbindFs();
+  };
 }
